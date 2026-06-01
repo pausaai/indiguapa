@@ -16,6 +16,29 @@ except FileNotFoundError:
     sys.exit(1)
 
 root = Tk()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# THEME
+# ═══════════════════════════════════════════════════════════════════════════
+
+BG_MAIN      = "#1f2937"   # fondo principal
+BG_PANEL     = "#273449"   # paneles
+BG_SECONDARY = "#334155"   # paneles secundarios
+CTRL_BG      = "#475569"   # entradas
+
+TEXT_PRIMARY = "#f8fafc"
+TEXT_MUTED   = "#94a3b8"
+TEXT_ACCENT  = "#38bdf8"
+
+BTN_BG       = "#0ea5e9"
+BTN_HOVER    = "#0284c7"
+
+SUCCESS      = "#22c55e"
+ERROR        = "#ef4444"
+WARNING      = "#f59e0b"
+
+PLACEHOLDER_COLOR = TEXT_MUTED
+NORMAL_COLOR      = TEXT_PRIMARY
 root.title("Airport Management System")
 root.geometry("1450x850")
 root.configure(bg="#2a2a3d")
@@ -29,8 +52,8 @@ FONT_B = ("Segoe UI", 9, "bold")
 bcn = None
 
 # ── Placeholder helper ────────────────────────────────────────────────────
-PLACEHOLDER_COLOR = "#888899"
-NORMAL_COLOR      = "#ffffff"
+PLACEHOLDER_COLOR = TEXT_MUTED
+NORMAL_COLOR      = TEXT_PRIMARY
 
 def add_placeholder(entry, text):
     entry.insert(0, text)
@@ -75,10 +98,10 @@ def ShowPlot(fig, right_panel_builder=None):
         frame3.columnconfigure(0, weight=4)
         frame3.columnconfigure(1, weight=1)
 
-        graph_frame = Frame(frame3, bg="#2a2a3d")
+        graph_frame = Frame(frame3, bg=BG_MAIN)
         graph_frame.grid(row=0, column=0, sticky="nsew")
 
-        right_frame = Frame(frame3, bg="#222233", width=280)
+        right_frame = Frame(frame3, bg=BG_PANEL, width=280)
         right_frame.grid(row=0, column=1, sticky="nsew")
         right_frame.pack_propagate(False)
 
@@ -119,16 +142,16 @@ def OpenAirlineSelector():
     win = Toplevel(root)
     win.title("Airline Filter")
     win.geometry("420x520")
-    win.configure(bg="#2a2a3d")
+    win.configure(bg=BG_MAIN)
 
-    Label(win, text="Search airline:", bg="#2a2a3d", fg="white").pack(pady=5)
+    Label(win, text="Search airline:", bg=BG_MAIN, fg=TEXT_PRIMARY).pack(pady=5)
     search_var = StringVar()
     Entry(win, textvariable=search_var, width=35).pack()
 
     listbox = Listbox(win, height=10, width=40)
     listbox.pack(pady=5)
 
-    Label(win, text="Selected airlines:", bg="#2a2a3d", fg="#c084fc").pack()
+    Label(win, text="Selected airlines:", bg=BG_MAIN, fg="#c084fc").pack()
     selected_box = Listbox(win, height=6, width=40)
     selected_box.pack(pady=5)
 
@@ -184,7 +207,7 @@ def OpenAirlineSelector():
     Button(win, text="← Remove",     command=remove, width=20).pack(pady=2)
     Button(win, text="Clear",        command=clear,  width=20).pack(pady=2)
     Button(win, text="Apply Filter", command=apply,  width=25,
-           bg="#7c3aed", fg="white").pack(pady=10)
+           bg=BTN_BG, fg="white").pack(pady=10)
 
 
 def PlotAp():
@@ -473,19 +496,19 @@ def RenderOccupancyChart(graph_frame, terminal_filter, area_filter,
     # ── draw chart ─────────────────────────────────────────────────────────
     if not filtered:
         Label(graph_frame, text="No gates match the current filters.",
-              bg="#2a2a3d", fg="#c084fc", font=("Segoe UI", 13)).pack(expand=True)
+              bg=BG_MAIN, fg=TEXT_ACCENT, font=("Segoe UI", 13)).pack(expand=True)
         return
 
     names   = [row[0] for row in filtered]
     statuses= [row[1] for row in filtered]
     ids     = [row[2] for row in filtered]
-    colors  = ["#4ade80" if s == "free" else "#f87171" for s in statuses]
+    colors  = [SUCCESS if s == "free" else ERROR for s in statuses]
 
     fig, ax = plt.subplots(figsize=(10, max(3, len(names) * 0.32)))
-    fig.patch.set_facecolor("#2a2a3d")
+    fig.patch.set_facecolor(BG_MAIN)
     ax.set_facecolor("#1e1e2e")
 
-    ax.barh(names, [1] * len(names), color=colors, edgecolor="#2a2a3d", height=0.72)
+    ax.barh(names, [1] * len(names), color=colors, edgecolor=BG_MAIN, height=0.72)
 
     for i, (status, aid) in enumerate(zip(statuses, ids)):
         label = "Free" if status == "free" else f"Occupied  ·  {aid}"
@@ -500,16 +523,16 @@ def RenderOccupancyChart(graph_frame, terminal_filter, area_filter,
     ax.set_title(
         f"Gate Occupancy — LEBL Barcelona\n"
         f"{total} gates  ·  {n_free} free  ·  {n_occ} occupied",
-        color="#c084fc", fontsize=11, fontweight="bold", pad=10
+        color=TEXT_ACCENT, fontsize=11, fontweight="bold", pad=10
     )
-    ax.tick_params(colors="#a0a0c0", labelsize=7.5)
+    ax.tick_params(colors=TEXT_MUTED, labelsize=7.5)
     ax.spines[:].set_visible(False)
     ax.xaxis.set_visible(False)
 
-    free_p = mpatches.Patch(color="#4ade80", label=f"Free ({n_free})")
-    occ_p  = mpatches.Patch(color="#f87171", label=f"Occupied ({n_occ})")
+    free_p = mpatches.Patch(color=SUCCESS, label=f"Free ({n_free})")
+    occ_p  = mpatches.Patch(color=ERROR, label=f"Occupied ({n_occ})")
     ax.legend(handles=[free_p, occ_p], loc="lower right",
-              facecolor="#313244", labelcolor="white", fontsize=8)
+              facecolor=BG_SECONDARY, labelcolor=TEXT_PRIMARY, fontsize=8)
 
     plt.tight_layout()
 
@@ -522,10 +545,10 @@ def RenderOccupancyChart(graph_frame, terminal_filter, area_filter,
 def BuildOccupancyPanel(right_frame, graph_frame):
     """Side panel with all filters for the occupancy view."""
 
-    PANEL_BG  = "#222233"
-    CTRL_BG   = "#2e2e44"
-    FG        = "#c084fc"
-    FG2       = "#ffffff"
+    PANEL_BG  = BG_PANEL
+    CTRL_BG   = BG_SECONDARY
+    FG        = TEXT_ACCENT
+    FG2       = TEXT_MUTED
     FONT_LBL  = ("Segoe UI", 8, "bold")
     FONT_CTRL = ("Segoe UI", 9)
 
@@ -590,21 +613,21 @@ def BuildOccupancyPanel(right_frame, graph_frame):
     def section(title):
         Label(inner, text=title, bg=PANEL_BG, fg=FG,
               font=FONT_LBL).pack(anchor="w", padx=10, pady=(12, 2))
-        Frame(inner, bg="#3a3a5c", height=1).pack(fill=X, padx=8, pady=(0, 4))
+        Frame(inner, bg=CTRL_BG, height=1).pack(fill=X, padx=8, pady=(0, 4))
 
     def dropdown(var, options):
         om = OptionMenu(inner, var, *options, command=refresh)
         om.config(bg=CTRL_BG, fg=FG2, font=FONT_CTRL, relief=FLAT,
-                  activebackground="#3a3a5c", activeforeground=FG2,
+                  activebackground=CTRL_BG, activeforeground=FG2,
                   highlightthickness=0, width=18)
         om["menu"].config(bg=CTRL_BG, fg=FG2, font=FONT_CTRL,
-                          activebackground="#7c3aed")
+                          activebackground=BTN_BG)
         om.pack(padx=10, pady=2, fill=X)
 
     def listbox_filter(var, options, height=5):
         """Listbox that updates var and triggers refresh on select."""
         lb = Listbox(inner, bg=CTRL_BG, fg=FG2, font=FONT_CTRL,
-                     selectbackground="#7c3aed", selectforeground="white",
+                     selectbackground=BTN_BG, selectforeground=TEXT_PRIMARY,
                      height=height, relief=FLAT, bd=0,
                      exportselection=False)
         for o in options:
@@ -625,9 +648,9 @@ def BuildOccupancyPanel(right_frame, graph_frame):
     # ── title ──────────────────────────────────────────────────────────────
     Label(inner, text="Gate Occupancy", bg=PANEL_BG, fg=FG,
           font=("Segoe UI", 11, "bold")).pack(pady=(14, 2))
-    Label(inner, text="Filters", bg=PANEL_BG, fg="#888899",
+    Label(inner, text="Filters", bg=PANEL_BG, fg=TEXT_MUTED,
           font=("Segoe UI", 8)).pack()
-    Frame(inner, bg="#3a3a5c", height=1).pack(fill=X, padx=8, pady=6)
+    Frame(inner, bg=CTRL_BG, height=1).pack(fill=X, padx=8, pady=6)
 
     # ── search ─────────────────────────────────────────────────────────────
     section("🔍  Search gate / aircraft")
@@ -642,7 +665,7 @@ def BuildOccupancyPanel(right_frame, graph_frame):
     status_frame = Frame(inner, bg=PANEL_BG)
     status_frame.pack(padx=10, pady=4, fill=X)
     for s in statuses:
-        color = "#4ade80" if s == "Free" else "#f87171" if s == "Occupied" else "#888899"
+        color = SUCCESS if s == "Free" else ERROR if s == "Occupied" else TEXT_MUTED
         rb = Radiobutton(status_frame, text=s, variable=status_var, value=s,
                          command=refresh, bg=PANEL_BG, fg=color,
                          selectcolor=PANEL_BG, activebackground=PANEL_BG,
@@ -668,7 +691,7 @@ def BuildOccupancyPanel(right_frame, graph_frame):
     add_placeholder(al_search, "Search airline…")
 
     al_lb = Listbox(inner, bg=CTRL_BG, fg=FG2, font=FONT_CTRL,
-                    selectbackground="#7c3aed", selectforeground="white",
+                    selectbackground=BTN_BG, selectforeground=TEXT_PRIMARY,
                     height=7, relief=FLAT, bd=0, exportselection=False)
     al_lb.pack(padx=10, pady=2, fill=X)
 
@@ -698,7 +721,7 @@ def BuildOccupancyPanel(right_frame, graph_frame):
     populate_airlines()
 
     # ── reset button ───────────────────────────────────────────────────────
-    Frame(inner, bg="#3a3a5c", height=1).pack(fill=X, padx=8, pady=10)
+    Frame(inner, bg=CTRL_BG, height=1).pack(fill=X, padx=8, pady=10)
 
     def reset_filters():
         terminal_var.set("All")
@@ -711,8 +734,8 @@ def BuildOccupancyPanel(right_frame, graph_frame):
         refresh()
 
     Button(inner, text="↺  Reset all filters", command=reset_filters,
-           bg="#3a3a5c", fg=FG2, font=FONT_CTRL, relief=FLAT,
-           activebackground="#7c3aed", activeforeground="white",
+           bg=CTRL_BG, fg=FG2, font=FONT_CTRL, relief=FLAT,
+           activebackground="#7c3aed", activeforeground=TEXT_PRIMARY,
            cursor="hand2").pack(padx=10, pady=4, fill=X, ipady=5)
 
     Frame(inner, bg=PANEL_BG, height=20).pack()
@@ -733,10 +756,10 @@ def ShowOccupancy():
     frame3.columnconfigure(0, weight=4)
     frame3.columnconfigure(1, weight=1)
 
-    graph_frame = Frame(frame3, bg="#2a2a3d")
+    graph_frame = Frame(frame3, bg=BG_MAIN)
     graph_frame.grid(row=0, column=0, sticky="nsew")
 
-    right_frame = Frame(frame3, bg="#222233", width=280)
+    right_frame = Frame(frame3, bg=BG_PANEL, width=280)
     right_frame.grid(row=0, column=1, sticky="nsew")
     right_frame.pack_propagate(False)
 
@@ -858,27 +881,27 @@ def AssignGateUI():
 def BuildAirlineFilter(right_frame, graph_frame):
     global airline_search_var
 
-    Label(right_frame, text="Airline Filter", bg="#222233", fg="#c084fc",
+    Label(right_frame, text="Airline Filter", bg=BG_PANEL, fg=TEXT_ACCENT,
           font=("Segoe UI", 11, "bold")).pack(pady=10)
 
     airline_search_var = StringVar()
 
     search_entry = Entry(right_frame, textvariable=airline_search_var, width=25,
-                         fg=PLACEHOLDER_COLOR, bg="#2e2e44",
-                         insertbackground="white", relief=FLAT)
+                         fg=PLACEHOLDER_COLOR, bg=BG_SECONDARY,
+                         insertbackground=TEXT_PRIMARY, relief=FLAT)
     search_entry.pack(pady=5, padx=8, fill=X, ipady=4)
     add_placeholder(search_entry, "Search airline…")
 
-    available_box = Listbox(right_frame, bg="#2e2e44", fg="white",
-                            selectbackground="#7c3aed", relief=FLAT,
+    available_box = Listbox(right_frame, bg=BG_SECONDARY, fg=TEXT_PRIMARY,
+                            selectbackground=BTN_BG, relief=FLAT,
                             height=10, exportselection=False)
     available_box.pack(padx=8, pady=4, fill=X)
 
-    Label(right_frame, text="Selected", bg="#222233", fg="white",
+    Label(right_frame, text="Selected", bg=BG_PANEL, fg=TEXT_PRIMARY,
           font=("Segoe UI", 8, "bold")).pack()
 
-    selected_box = Listbox(right_frame, bg="#2e2e44", fg="#c084fc",
-                           selectbackground="#7c3aed", relief=FLAT,
+    selected_box = Listbox(right_frame, bg=BG_SECONDARY, fg=TEXT_ACCENT,
+                           selectbackground=BTN_BG, relief=FLAT,
                            height=6, exportselection=False)
     selected_box.pack(padx=8, pady=4, fill=X)
 
@@ -928,15 +951,15 @@ def BuildAirlineFilter(right_frame, graph_frame):
 
     airline_search_var.trace_add("write", lambda *args: refresh_available())
 
-    btn_cfg = dict(bg="#3a3a5c", fg="white", relief=FLAT,
-                   activebackground="#7c3aed", activeforeground="white",
+    btn_cfg = dict(bg=CTRL_BG, fg=TEXT_PRIMARY, relief=FLAT,
+                   activebackground=BTN_BG, activeforeground=TEXT_PRIMARY,
                    font=("Segoe UI", 8), cursor="hand2")
 
     Button(right_frame, text="Add →",    command=add,   **btn_cfg).pack(padx=8, pady=2, fill=X, ipady=3)
     Button(right_frame, text="← Remove", command=remove,**btn_cfg).pack(padx=8, pady=2, fill=X, ipady=3)
     Button(right_frame, text="Clear",    command=clear, **btn_cfg).pack(padx=8, pady=2, fill=X, ipady=3)
-    Button(right_frame, text="Apply", bg="#7c3aed", fg="white", relief=FLAT,
-           activebackground="#6d28d9", font=("Segoe UI", 9, "bold"),
+    Button(right_frame, text="Apply", bg=BTN_BG, fg=TEXT_PRIMARY, relief=FLAT,
+           activebackground=BTN_HOVER, font=("Segoe UI", 9, "bold"),
            command=PlotAl, cursor="hand2").pack(padx=8, pady=8, fill=X, ipady=5)
 
     refresh_available()
@@ -947,18 +970,18 @@ def BuildAirlineFilter(right_frame, graph_frame):
 # LAYOUT
 # ═══════════════════════════════════════════════════════════════════════════
 
-left = Frame(root, bg="#2a2a3d")
+left = Frame(root, bg=BG_MAIN)
 left.grid(row=0, column=0, sticky="nsew")
 
-Label(left, text="AIRPORT CONTROL", bg="#2a2a3d", fg="#c084fc",
+Label(left, text="AIRPORT CONTROL", bg=BG_MAIN, fg=TEXT_ACCENT,
       font=("Segoe UI", 16, "bold")).grid(row=0, column=0, pady=10)
 
 BTN = {
-    "bg": "#7c3aed", "fg": "white", "font": FONT_B,
+    "bg": BTN_BG, "fg": TEXT_PRIMARY, "font": FONT_B,
     "width": 24, "height": 1, "relief": "flat"
 }
 
-Label(left, text="Graphs", bg="#2a2a3d", fg="#c084fc").grid()
+Label(left, text="Graphs", bg=BG_MAIN, fg=TEXT_ACCENT).grid()
 
 Button(left, text="Airports",      command=PlotAp,      **BTN).grid(pady=2)
 Button(left, text="Show Airlines", command=PlotAl,      **BTN).grid(pady=2)
@@ -968,11 +991,11 @@ Button(left, text="Map Airports",  command=MapAp,       **BTN).grid(pady=2)
 Button(left, text="Map Flights",   command=MapFl,       **BTN).grid(pady=2)
 Button(left, text="Long Flights",  command=MapFlLong,   **BTN).grid(pady=2)
 
-Label(left, text="Airports", bg="#2a2a3d", fg="#c084fc").grid(pady=5)
+Label(left, text="Airports", bg=BG_MAIN, fg=TEXT_ACCENT).grid(pady=5)
 
-icao      = Entry(left, width=30, bg="#3a3a5c", fg=PLACEHOLDER_COLOR, insertbackground="white")
-latitude  = Entry(left, width=30, bg="#3a3a5c", fg=PLACEHOLDER_COLOR, insertbackground="white")
-longitude = Entry(left, width=30, bg="#3a3a5c", fg=PLACEHOLDER_COLOR, insertbackground="white")
+icao      = Entry(left, width=30, bg=CTRL_BG, fg=PLACEHOLDER_COLOR, insertbackground=TEXT_PRIMARY)
+latitude  = Entry(left, width=30, bg=CTRL_BG, fg=PLACEHOLDER_COLOR, insertbackground=TEXT_PRIMARY)
+longitude = Entry(left, width=30, bg=CTRL_BG, fg=PLACEHOLDER_COLOR, insertbackground=TEXT_PRIMARY)
 icao.grid(pady=1);      add_placeholder(icao,      PH_ICAO)
 latitude.grid(pady=1);  add_placeholder(latitude,  PH_LAT)
 longitude.grid(pady=1); add_placeholder(longitude, PH_LON)
@@ -981,14 +1004,14 @@ Button(left, text="Save",   command=Save,   **BTN).grid(pady=2)
 Button(left, text="Add",    command=Add,    **BTN).grid(pady=2)
 Button(left, text="Remove", command=Remove, **BTN).grid(pady=2)
 
-Label(left, text="Operations", bg="#2a2a3d", fg="#c084fc").grid(pady=5)
+Label(left, text="Operations", bg=BG_MAIN, fg=TEXT_ACCENT).grid(pady=5)
 
 Button(left, text="Load Structure", command=LoadAP,        **BTN).grid(pady=2)
 Button(left, text="Occupancy",      command=ShowOccupancy, **BTN).grid(pady=2)
 
-terminal_entry = Entry(left, width=30, bg="#3a3a5c", fg=PLACEHOLDER_COLOR, insertbackground="white")
-airline_entry  = Entry(left, width=30, bg="#3a3a5c", fg=PLACEHOLDER_COLOR, insertbackground="white")
-aircraft_entry = Entry(left, width=30, bg="#3a3a5c", fg=PLACEHOLDER_COLOR, insertbackground="white")
+terminal_entry = Entry(left, width=30, bg=CTRL_BG, fg=PLACEHOLDER_COLOR, insertbackground=TEXT_PRIMARY)
+airline_entry  = Entry(left, width=30, bg=CTRL_BG, fg=PLACEHOLDER_COLOR, insertbackground=TEXT_PRIMARY)
+aircraft_entry = Entry(left, width=30, bg=CTRL_BG, fg=PLACEHOLDER_COLOR, insertbackground=TEXT_PRIMARY)
 terminal_entry.grid(pady=1); add_placeholder(terminal_entry, PH_TERMINAL)
 airline_entry.grid(pady=1);  add_placeholder(airline_entry,  PH_AIRLINE)
 
@@ -1001,12 +1024,11 @@ Button(left, text="Assign Gate", command=AssignGateUI, **BTN).grid(pady=2)
 
 
 # ── Right visualiser panel ────────────────────────────────────────────────
-frame3 = Frame(root, bg="#2a2a3d")
+frame3 = Frame(root, bg=BG_MAIN)
 frame3.grid(row=0, column=1, sticky="nsew")
 frame3.rowconfigure(0, weight=1)
 frame3.columnconfigure(0, weight=1)
 
-Label(frame3, text="Select a function", bg="#2a2a3d", fg="#c084fc",
-      font=("Segoe UI", 14)).grid()
+Label(frame3, text="Select a function", bg=BG_MAIN, fg=TEXT_ACCENT, font=("Segoe UI", 14)).grid(pady=5)
 
 root.mainloop()
