@@ -102,7 +102,18 @@ airline_search_var = None
 
 def OpenAirlineSelector():
     global all_airlines
-    data = LoadArrivals()
+
+    # ── NEW: guard against missing arrivals data ──────────────────────────
+    try:
+        data = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals data:\n{e}")
+        return
+
+    if not data:
+        messagebox.showwarning("No Data", "No arrivals data found to filter by airline.")
+        return
+
     all_airlines = sorted(list(set([d.company for d in data])))
 
     win = Toplevel(root)
@@ -140,7 +151,7 @@ def OpenAirlineSelector():
                 selected_airlines.append(val)
                 refresh_selected()
         except:
-            messagebox.showerror("Error", "Select airline")
+            messagebox.showerror("Error", "Select an airline from the list first.")
 
     def remove():
         try:
@@ -148,13 +159,20 @@ def OpenAirlineSelector():
             selected_airlines.remove(val)
             refresh_selected()
         except:
-            messagebox.showerror("Error", "Select selected airline")
+            messagebox.showerror("Error", "Select a selected airline to remove first.")
 
     def clear():
         selected_airlines.clear()
         refresh_selected()
 
     def apply():
+        # ── NEW: warn if no airlines selected (will show all) ─────────────
+        if not selected_airlines:
+            if not messagebox.askyesno(
+                "No Filter",
+                "No airlines selected — all airlines will be shown.\nContinue?"
+            ):
+                return
         win.destroy()
         PlotAl()
 
@@ -170,30 +188,113 @@ def OpenAirlineSelector():
 
 
 def PlotAp():
-    ShowPlot(PlotAirports(LoadAirports()))
+    # ── NEW: guard against empty airport data ─────────────────────────────
+    try:
+        airports = LoadAirports()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load airports:\n{e}")
+        return
+    if not airports:
+        messagebox.showwarning("No Data", "No airports found in Airports.txt.")
+        return
+    ShowPlot(PlotAirports(airports))
 
 def PlotArrRate():
-    ShowPlot(PlotArrivals(LoadArrivals()))
+    # ── NEW: guard against empty arrivals data ────────────────────────────
+    try:
+        arrivals = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals:\n{e}")
+        return
+    if not arrivals:
+        messagebox.showwarning("No Data", "No arrivals data found to plot.")
+        return
+    ShowPlot(PlotArrivals(arrivals))
 
 def PlotFlTy():
-    ShowPlot(PlotFlightsType(LoadArrivals()))
+    # ── NEW: guard against empty arrivals data ────────────────────────────
+    try:
+        arrivals = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals:\n{e}")
+        return
+    if not arrivals:
+        messagebox.showwarning("No Data", "No arrivals data found to plot flight types.")
+        return
+    ShowPlot(PlotFlightsType(arrivals))
 
 def PlotAl():
-    data = LoadArrivals()
+    # ── NEW: guard against empty arrivals data ────────────────────────────
+    try:
+        data = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals:\n{e}")
+        return
+    if not data:
+        messagebox.showwarning("No Data", "No arrivals data found to plot airlines.")
+        return
     filtered = [d for d in data if d.company in selected_airlines] if selected_airlines else data
+    # ── NEW: warn if filter produced zero results ─────────────────────────
+    if not filtered:
+        messagebox.showwarning(
+            "No Results",
+            "The selected airline filter returned no flights.\n"
+            "Try removing some airlines from the filter."
+        )
+        return
     ShowPlot(PlotAirlines(filtered), right_panel_builder=BuildAirlineFilter)
 
 def MapAp():
-    MapAirports(LoadAirports())
-    os.system("start Airports.kml")
+    # ── NEW: guard against empty airport data ─────────────────────────────
+    try:
+        airports = LoadAirports()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load airports:\n{e}")
+        return
+    if not airports:
+        messagebox.showwarning("No Data", "No airports found in Airports.txt.")
+        return
+    try:
+        MapAirports(airports)
+        os.system("start Airports.kml")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to generate airport map:\n{e}")
 
 def MapFl():
-    MapFlights(LoadArrivals())
-    os.system("start Flights.kml")
+    # ── NEW: guard against empty arrivals data ────────────────────────────
+    try:
+        arrivals = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals:\n{e}")
+        return
+    if not arrivals:
+        messagebox.showwarning("No Data", "No arrivals data found to map.")
+        return
+    try:
+        MapFlights(arrivals)
+        os.system("start Flights.kml")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to generate flights map:\n{e}")
 
 def MapFlLong():
-    MapFlights(LongDistanceArrivals(LoadArrivals()))
-    os.system("start Flights.kml")
+    # ── NEW: guard against empty arrivals/long-distance data ──────────────
+    try:
+        arrivals = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals:\n{e}")
+        return
+    if not arrivals:
+        messagebox.showwarning("No Data", "No arrivals data found.")
+        return
+    long_flights = LongDistanceArrivals(arrivals)
+    if not long_flights:
+        messagebox.showwarning("No Results", "No long-distance arrivals found in the data.")
+        return
+    try:
+        MapFlights(long_flights)
+        os.system("start Flights.kml")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to generate long-distance flights map:\n{e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -201,28 +302,88 @@ def MapFlLong():
 # ═══════════════════════════════════════════════════════════════════════════
 
 def Save():
-    lat = get_value(latitude, PH_LAT)
-    lon = get_value(longitude, PH_LON)
-    if lat == "" or lon == "":
-        messagebox.showerror("Error", "Check coordinates")
+    icao_val = get_value(icao, PH_ICAO)
+    lat      = get_value(latitude,  PH_LAT)
+    lon      = get_value(longitude, PH_LON)
+
+    # ── NEW: validate all three fields ────────────────────────────────────
+    if icao_val == "":
+        messagebox.showerror("Error", "ICAO code is required.")
         return
-    a = Airport()
-    a.icao      = get_value(icao, PH_ICAO)
-    a.latitude  = ConvertCoordinates(lat)
-    a.longitude = ConvertCoordinates(lon)
-    SetSchengen(a)
-    SaveSchengenAirports(a)
+    if lat == "" or lon == "":
+        messagebox.showerror("Error", "Both latitude and longitude are required.")
+        return
+
+    try:
+        a = Airport()
+        a.icao      = icao_val
+        a.latitude  = ConvertCoordinates(lat)
+        a.longitude = ConvertCoordinates(lon)
+        SetSchengen(a)
+        SaveSchengenAirports(a)
+        # ── NEW: success confirmation ──────────────────────────────────────
+        messagebox.showinfo("Saved", f"Airport '{icao_val}' saved successfully.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to save airport:\n{e}")
 
 def Add():
-    a = Airport()
-    a.icao      = get_value(icao, PH_ICAO)
-    a.latitude  = ConvertCoordinates(get_value(latitude, PH_LAT))
-    a.longitude = ConvertCoordinates(get_value(longitude, PH_LON))
-    SetSchengen(a)
-    AddAirport(a)
+    icao_val = get_value(icao,      PH_ICAO)
+    lat      = get_value(latitude,  PH_LAT)
+    lon      = get_value(longitude, PH_LON)
+
+    # ── NEW: validate all fields before adding ────────────────────────────
+    if icao_val == "":
+        messagebox.showerror("Error", "ICAO code is required.")
+        return
+    if lat == "":
+        messagebox.showerror("Error", "Latitude is required.")
+        return
+    if lon == "":
+        messagebox.showerror("Error", "Longitude is required.")
+        return
+
+    try:
+        a = Airport()
+        a.icao      = icao_val
+        a.latitude  = ConvertCoordinates(lat)
+        a.longitude = ConvertCoordinates(lon)
+        SetSchengen(a)
+        AddAirport(a)
+        # ── NEW: success confirmation ──────────────────────────────────────
+        if lat != "" and lon != "":
+            messagebox.showinfo("Added", f"Airport '{icao_val}' added successfully.")
+        else:
+            messagebox.showerror("Error", "Latitude and longitude are required.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to add airport:\n{e}")
 
 def Remove():
-    RemoveAirport(LoadAirports(), get_value(icao, PH_ICAO))
+    icao_val = get_value(icao, PH_ICAO)
+
+    # ── NEW: validate ICAO field ──────────────────────────────────────────
+    if icao_val == "":
+        messagebox.showerror("Error", "Enter an ICAO code to remove.")
+        return
+
+    # ── NEW: confirm before deleting ─────────────────────────────────────
+    if not messagebox.askyesno(
+        "Confirm Removal",
+        f"Are you sure you want to remove airport '{icao_val}'?"
+    ):
+        return
+
+    try:
+        airports = LoadAirports()
+        # ── NEW: check the airport actually exists ────────────────────────
+        exists = any(a.icao == icao_val for a in airports)
+        if not exists:
+            messagebox.showerror("Not Found", f"Airport '{icao_val}' not found in Airports.txt.")
+            return
+        RemoveAirport(airports, icao_val)
+        # ── NEW: success confirmation ──────────────────────────────────────
+        messagebox.showinfo("Removed", f"Airport '{icao_val}' removed successfully.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to remove airport:\n{e}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -231,7 +392,7 @@ def Remove():
 
 def LoadAP():
     global bcn
-    result = LoadAirportStructure("Terminals.txt")
+    result = LoadAirportStructure()
     if result == -1:
         messagebox.showerror("Error", "Terminals.txt not found")
         return
@@ -249,7 +410,16 @@ def RenderOccupancyChart(graph_frame, terminal_filter, area_filter,
     for w in graph_frame.winfo_children():
         w.destroy()
 
-    occupancy = GateOccupancy(bcn)
+    # ── NEW: guard against bcn not loaded ────────────────────────────────
+    if bcn is None:
+        messagebox.showerror("Error", "Airport structure is not loaded.")
+        return
+
+    try:
+        occupancy = GateOccupancy(bcn)
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to retrieve gate occupancy:\n{e}")
+        return
 
     # ── apply filters ──────────────────────────────────────────────────────
     filtered = []
@@ -579,13 +749,18 @@ def SearchAirline():
         return
     name = get_value(airline_entry, PH_AIRLINE)
     if name == "":
-        messagebox.showerror("Error", "Enter an airline name")
+        messagebox.showerror("Error", "Enter an airline ICAO code to search.")
         return
-    res = SearchTerminal(bcn, name)
+    # ── NEW: wrap in try/except ───────────────────────────────────────────
+    try:
+        res = SearchTerminal(bcn, name)
+    except Exception as e:
+        messagebox.showerror("Error", f"Search failed:\n{e}")
+        return
     if res == "":
-        messagebox.showinfo("Not found", f"{name} not found in any terminal")
+        messagebox.showinfo("Not Found", f"'{name}' was not found in any terminal.")
     else:
-        messagebox.showinfo("Terminal found", f"{name} boards at terminal {res}")
+        messagebox.showinfo("Terminal Found", f"'{name}' boards at terminal {res}.")
 
 def CheckIsAirlineInTerminal():
     if bcn is None:
@@ -593,15 +768,31 @@ def CheckIsAirlineInTerminal():
         return
     t_name  = get_value(terminal_entry, PH_TERMINAL)
     airline = get_value(airline_entry,  PH_AIRLINE)
-    t_obj   = next((t for t in bcn.terminals if t.name == t_name), None)
-    if t_obj is None:
-        messagebox.showerror("Error", "Terminal not found")
+
+    # ── NEW: validate both fields ─────────────────────────────────────────
+    if t_name == "":
+        messagebox.showerror("Error", "Enter a terminal name (e.g. T1).")
         return
-    res = IsAirlineInTerminal(t_obj, airline)
+    if airline == "":
+        messagebox.showerror("Error", "Enter an airline ICAO code.")
+        return
+
+    t_obj = next((t for t in bcn.terminals if t.name == t_name), None)
+    if t_obj is None:
+        messagebox.showerror("Not Found", f"Terminal '{t_name}' does not exist in the loaded structure.")
+        return
+
+    # ── NEW: wrap in try/except ───────────────────────────────────────────
+    try:
+        res = IsAirlineInTerminal(t_obj, airline)
+    except Exception as e:
+        messagebox.showerror("Error", f"Check failed:\n{e}")
+        return
+
     if res:
-        messagebox.showinfo("Result", f"{airline} IS in terminal {t_name}")
+        messagebox.showinfo("Result", f"'{airline}' IS assigned to terminal {t_name}.")
     else:
-        messagebox.showinfo("Result", f"{airline} is NOT in terminal {t_name}")
+        messagebox.showinfo("Result", f"'{airline}' is NOT assigned to terminal {t_name}.")
 
 def AssignGateUI():
     if bcn is None:
@@ -609,26 +800,55 @@ def AssignGateUI():
         return
     aircraft_id = get_value(aircraft_entry, PH_AIRCRAFT)
     if aircraft_id == "":
-        messagebox.showerror("Error", "Enter an aircraft ID")
+        messagebox.showerror("Error", "Enter an aircraft ID.")
         return
-    arrivals = LoadArrivals()
-    target   = next((a for a in arrivals if a.id == aircraft_id), None)
+
+    # ── NEW: guard against arrivals load failure ──────────────────────────
+    try:
+        arrivals = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals:\n{e}")
+        return
+
+    target = next((a for a in arrivals if a.id == aircraft_id), None)
     if target is None:
-        messagebox.showerror("Not Found", f"Aircraft {aircraft_id} not found in Arrivals.txt")
+        messagebox.showerror("Not Found", f"Aircraft '{aircraft_id}' was not found in Arrivals.txt.")
         return
-    result = AssignGate(bcn, target)
+
+    # ── NEW: wrap AssignGate in try/except ────────────────────────────────
+    try:
+        result = AssignGate(bcn, target)
+    except Exception as e:
+        messagebox.showerror("Error", f"Gate assignment failed:\n{e}")
+        return
+
     if result == -1:
-        messagebox.showerror("Failed", f"No free gate available for {aircraft_id}")
+        messagebox.showerror("No Gate Available",
+            f"No free gate could be assigned to aircraft '{aircraft_id}'.\n"
+            "All compatible gates may be occupied.")
         return
+
     gate_name = ""
     for t in bcn.terminals:
         for a in t.areas:
             for g in a.gates:
                 if g.ID == aircraft_id:
                     gate_name = g.name
+                    break
+
+    # ── NEW: handle edge case where gate was assigned but name not found ──
+    if gate_name == "":
+        messagebox.showwarning(
+            "Gate Assigned",
+            f"Aircraft '{aircraft_id}' was assigned a gate, but the gate name could not be retrieved."
+        )
+        return
+
     messagebox.showinfo("Gate Assigned",
-        f"Aircraft: {aircraft_id}\nAirline: {target.company}\n"
-        f"Origin: {target.origin}\nGate: {gate_name}")
+        f"Aircraft:  {aircraft_id}\n"
+        f"Airline:   {target.company}\n"
+        f"Origin:    {target.origin}\n"
+        f"Gate:      {gate_name}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -662,7 +882,13 @@ def BuildAirlineFilter(right_frame, graph_frame):
                            height=6, exportselection=False)
     selected_box.pack(padx=8, pady=4, fill=X)
 
-    data     = LoadArrivals()
+    # ── NEW: guard against arrivals load failure ──────────────────────────
+    try:
+        data = LoadArrivals()
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load arrivals for airline filter:\n{e}")
+        return
+
     airlines = sorted(set(d.company for d in data))
 
     def refresh_available():
@@ -686,7 +912,7 @@ def BuildAirlineFilter(right_frame, graph_frame):
                 selected_airlines.append(val)
             refresh_selected()
         except:
-            pass
+            messagebox.showerror("Error", "Select an airline from the list first.")
 
     def remove():
         try:
@@ -694,7 +920,7 @@ def BuildAirlineFilter(right_frame, graph_frame):
             selected_airlines.remove(val)
             refresh_selected()
         except:
-            pass
+            messagebox.showerror("Error", "Select a selected airline to remove first.")
 
     def clear():
         selected_airlines.clear()
