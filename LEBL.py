@@ -1,3 +1,6 @@
+from airport import IsSchengenAirport
+
+
 class Gate:
     def __init__(self):
         self.name = ""
@@ -57,7 +60,7 @@ def LoadAirlines(terminal, t_name):
 
 def LoadAirportStructure():
     try:
-        f = open("LEBL.txt", "r")
+        f = open("Terminals.txt", "r")
     except:
         return -1
 
@@ -131,20 +134,25 @@ def SearchTerminal(bcn, name):
 
 def AssignGate(bcn, aircraft):
     terminal_name = SearchTerminal(bcn, aircraft.company)
-    if terminal_name == "":
-        print("Airline not found in any terminal")
-        return -1
+    if terminal_name != "":
+        terminal = next((t for t in bcn.terminals if t.name == terminal_name), None)
+        if terminal is not None:
+            for area in terminal.areas:
+                for gate in area.gates:
+                    if gate.free:
+                        gate.free = False
+                        gate.ID = aircraft.id
+                        return 0
+    is_schengen = IsSchengenAirport(aircraft.origin)
+    for terminal in bcn.terminals:
+        for area in terminal.areas:
+            if area.type == is_schengen:
+                for gate in area.gates:
+                    if gate.free:
+                        gate.free = False
+                        gate.ID = aircraft.id
+                        return 0
 
-    terminal = next((t for t in bcn.terminals if t.name == terminal_name), None)
-    if terminal is None:
-        return -1
-
-    for area in terminal.areas:
-        for gate in area.gates:
-            if gate.free:
-                gate.free = False
-                gate.ID   = aircraft.id
-                return 0
     return -1
 
 def AssignNightGates(bcn, aircrafts):
@@ -154,7 +162,7 @@ def AssignNightGates(bcn, aircrafts):
         return -1
     i = 0
     while i < len(aircrafts):
-        # Only process aircraft with no arrival data (night aircraft)
+
         if aircrafts[i].time == "00:00" and aircrafts[i].origin == "":
             AssignGate(bcn, aircrafts[i])
         i = i + 1
@@ -166,7 +174,6 @@ def AssignNightGates(bcn, aircrafts):
         return -1
     i = 0
     while i < len(aircrafts):
-        # Only process aircraft with no arrival data (night aircraft)
         if aircrafts[i].time == "00:00" and aircrafts[i].origin == "":
             AssignGate(bcn, aircrafts[i])
         i = i + 1
@@ -192,136 +199,107 @@ def FreeGate(bcn, id):
     return -1
 
 
-def AssignGatesAtTime(bcn, aircrafts, time):
-    # Parse the given hour as an integer (0-23)
+def LoadDepartures():
+    departures = {}
+    try:
+        f = open("Departures.txt", "r")
+    except:
+        return {}
+
+    lines = f.readlines()
+    f.close()
+
+    for line in lines[1:]:  # Skip header row
+        line = line.strip()
+        if line != "":
+            parts = line.split()  # Split on whitespace instead of tab
+            if len(parts) >= 3:
+                flight_id   = parts[0].strip()
+                depart_time = parts[2].strip()  # Column 2 is departure, not 1
+                departures[flight_id] = depart_time
+
+    return departures
+
+
+def AssignGatesAtTime(bcn, aircrafts, time, departures):
     given_hour = int(time.split(":")[0])
+    events = []
+    for aircraft in aircrafts:
+        dep_time = departures.get(aircraft.id, "")
+        if dep_time != "" and dep_time != "00:00":
+            dep_hour = int(dep_time.split(":")[0])
+            dep_min = int(dep_time.split(":")[1])
+            if dep_hour == given_hour:
+                events.append((dep_hour, dep_min, "departure", aircraft))
 
-    # Step 1: free gates of aircraft that have already departed before
-    # the start of the considered period. An aircraft has departed if its
-    # departure time is strictly less than the given hour.
-    i = 0
-    while i < len(aircrafts):
-        aircraft = aircrafts[i]
-        # Only process aircraft that have a departure record
-        if hasattr(aircraft, 'departure') and aircraft.departure != "" and aircraft.departure != "00:00":
-            dep_hour = int(aircraft.departure.split(":")[0])
-            if dep_hour < given_hour:
-                FreeGate(bcn, aircraft.id)
-        i += 1
-
-    # Step 2: assign gates to aircraft landing during the one-hour period
-    # [given_hour, given_hour + 1). Count how many could not be assigned.
-    not_assigned = 0
-    i = 0
-    while i < len(aircrafts):
-        aircraft = aircrafts[i]
-        # Only process landing aircraft (those with a non-empty arrival time
-        # that is not the special night marker "00:00" with no origin)
-        if hasattr(aircraft, 'time') and aircraft.time != "" and aircraft.time != "00:00":
+        if aircraft.time != "" and aircraft.time != "00:00":
             land_hour = int(aircraft.time.split(":")[0])
-            if land_hour >= given_hour and land_hour < given_hour + 1:
-                result = AssignGate(bcn, aircraft)
-                if result == -1:
-                    not_assigned += 1
-        i += 1
+            land_min = int(aircraft.time.split(":")[1])
+            if land_hour == given_hour:
+                events.append((land_hour, land_min, "arrival", aircraft))
+                
+    events.sort(key=lambda e: (e[1], 0 if e[2] == "departure" else 1))
+
+    not_assigned = 0
+    for _, _, event_type, aircraft in events:
+        if event_type == "departure":
+            FreeGate(bcn, aircraft.id)
+        else:
+            if AssignGate(bcn, aircraft) == -1:
+                not_assigned += 1
 
     return not_assigned
 
 
 def PlotDayOccupancy(bcn, aircrafts):
-
     import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     import numpy as np
 
-    hours = []
-    # unassigned_counts[h] = number of aircraft not assigned during hour h
-    unassigned_counts = []
-    # terminal_counts[h] = list of occupied gate counts, one per terminal
-    terminal_counts = []
+    departures = LoadDepartures()
+
+    def count_occupied_gates(bcn):
+        return [
+            sum(1 for area in terminal.areas for gate in area.gates if not gate.free)
+            for terminal in bcn.terminals
+        ]
 
     terminal_names = [t.name for t in bcn.terminals]
-    num_terminals = len(terminal_names)
+    hours = list(range(1, 24))
+    unassigned_counts = []
+    terminal_counts = []
 
-    hour = 1
-    while hour <= 23:
-        time_str = str(hour).zfill(2) + ":00"
-        not_assigned = AssignGatesAtTime(bcn, aircrafts, time_str)
-        unassigned_counts.append(not_assigned)
+    for hour in hours:
+        unassigned_counts.append(AssignGatesAtTime(bcn, aircrafts, f"{hour:02d}:00", departures))
+        terminal_counts.append(count_occupied_gates(bcn))
 
-        # Count occupied gates per terminal
-        counts = []
-        t = 0
-        while t < len(bcn.terminals):
-            terminal = bcn.terminals[t]
-            occupied = 0
-            a = 0
-            while a < len(terminal.areas):
-                area = terminal.areas[a]
-                g = 0
-                while g < len(area.gates):
-                    if area.gates[g].free == False:
-                        occupied += 1
-                    g += 1
-                a += 1
-            counts.append(occupied)
-            t += 1
-        terminal_counts.append(counts)
-        hours.append(hour)
-        hour += 1
-
-    # Build the plot
     x = np.arange(len(hours))
-    # Width of each bar; distribute evenly within each group
-    if num_terminals > 0:
-        bar_width = 0.6 / num_terminals
-    else:
-        bar_width = 0.6
+    bar_width = 0.6 / max(len(terminal_names), 1)
+    colors = plt.colormaps["tab10"].colors
 
     fig, ax1 = plt.subplots(figsize=(14, 6))
 
-    # Color palette for terminals
-    colors = plt.colormaps["tab10"].colors
-
-    for idx in range(num_terminals):
-        offsets = x + (idx - num_terminals / 2 + 0.5) * bar_width
+    for idx, name in enumerate(terminal_names):
+        offsets = x + (idx - len(terminal_names) / 2 + 0.5) * bar_width
         values = [terminal_counts[h][idx] for h in range(len(hours))]
-        ax1.bar(
-            offsets,
-            values,
-            width=bar_width,
-            label=terminal_names[idx],
-            color=colors[idx % len(colors)],
-            alpha=0.85,
-            edgecolor="white",
-            linewidth=0.5
-        )
+        ax1.bar(offsets, values, width=bar_width, label=name,
+                color=colors[idx % len(colors)], alpha=0.85, edgecolor="white", linewidth=0.5)
 
     ax1.set_xlabel("Hour of day", fontsize=11)
     ax1.set_ylabel("Gates occupied", fontsize=11)
     ax1.set_xticks(x)
-    ax1.set_xticklabels([str(h).zfill(2) + ":00" for h in hours], rotation=45, ha="right")
+    ax1.set_xticklabels([f"{h:02d}:00" for h in hours], rotation=45, ha="right")
     ax1.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     ax1.legend(title="Terminal", loc="upper left", fontsize=9)
     ax1.set_title("Gate occupancy per terminal throughout the day", fontsize=13)
 
-    # Secondary y-axis: unassigned aircraft per hour
     ax2 = ax1.twinx()
-    ax2.plot(
-        x,
-        unassigned_counts,
-        color="crimson",
-        marker="o",
-        linewidth=1.8,
-        markersize=5,
-        label="Unassigned aircraft",
-        zorder=5
-    )
+    ax2.plot(x, unassigned_counts, color="crimson", marker="o",
+             linewidth=1.8, markersize=5, label="Unassigned aircraft", zorder=5)
     ax2.set_ylabel("Unassigned aircraft", fontsize=11, color="crimson")
     ax2.tick_params(axis="y", labelcolor="crimson")
     ax2.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     ax2.legend(loc="upper right", fontsize=9)
 
     plt.tight_layout()
-    plt.savefig("day_occupancy.png", dpi=150)
     plt.show()
